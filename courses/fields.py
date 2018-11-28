@@ -29,5 +29,3 @@ class OrderField(models.PositiveIntegerField):
         else:
             return super(OrderField,
                          self).pre_save(model_instance, add)
-
-
