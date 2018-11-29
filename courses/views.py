@@ -8,6 +8,7 @@ from django.forms.models import modelform_factory
 from django.apps import apps
 from .models import Course, Module, Content
 from .forms import ModuleFormSet
+from braces.views import CsrfExemptMixin, JsonRequestResponseMixin
 
 
 class OwnerMixin(object):
@@ -106,19 +107,19 @@ class ContentCreateUpdateView(TemplateResponseMixin, View):
                                                  'order',
                                                  'created',
                                                  'updated'])
-        return Form
+        return Form(*args, **kwargs)
 
-    def dispatch(self, request, module_id, model_name, *args, **kwargs):
+    def dispatch(self, request, module_id, model_name, id=None):
         self.module = get_object_or_404(Module,
-                                        id=module_id,
-                                        course__owner=request.user)
+                                       id=module_id,
+                                       course__owner=request.user)
         self.model = self.get_model(model_name)
         if id:
             self.obj = get_object_or_404(self.model,
                                          id=id,
                                          owner=request.user)
-        return super(ContentCreateUpdateView, self)\
-                        .dispatch(request, module_id, model_name, id)
+        return super(ContentCreateUpdateView,
+           self).dispatch(request, module_id, model_name, id)
 
     def get(self, request, module_id, model_name, id=None):
         form = self.get_form(self.model, instance=self.obj)
@@ -167,8 +168,25 @@ class ModuleContentListView(TemplateResponseMixin, View):
         return self.render_to_response({'module': module})
 
 
+class ModuleOrderView(CsrfExemptMixin,
+                      JsonRequestResponseMixin,
+                      View):
+    def post(self, request):
+        for id, order in self.request_json.items():
+            Module.objects.filter(id=id,
+                course__owner=request.user).update(order=order)
+        return self.render_json_response({'saved': 'OK'})
 
 
+class ContentOrderView(CsrfExemptMixin,
+                       JsonRequestResponseMixin,
+                       View):
+    def post(self, request):
+        for id, order in self.request_json.items():
+            Content.objects.filter(id=id,
+                    module__course__owner=request.user)\
+                    .update(order=order)
+        return self.render_json_response({'saved': 'OK'})
 
 
 
